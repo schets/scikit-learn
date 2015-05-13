@@ -14,12 +14,15 @@ def _gen_lazy_tree(clfn, ncutoff, points):
     This only computes clusters on demand, so the clustering algorithm can take
     this tree and progressively process it"""
     if len(points) <= ncutoff:
-        children = None
+        return {"cluster" : points}
     else:
         children = (_gen_lazy_tree(clfn, ncutoff, cluster)
                     for cluster in _lazy_clusters(clfn, points))
-
-    return {"children" : children, "cluster" : points}
+        return {"children" : children}
 
 def _force_tree(intree):
-    
+    "forces evaluation of a tree"
+    children = intree.get("children", None)
+    if children:
+        intree["children"] = [_force_tree(child) for child in children]
+    return intree
