@@ -9,15 +9,15 @@ from kmeans import MiniBatchKMeans
 import heapq as heap
 import numpy as np
 
-def _lazy_clusters(incl, points):
+def _lazy_clusters(incl, points, scorer):
     "a generator which only calls the clusterer when needed"
     #this should only call incl upon demand, should a timing unit test
     clusters = incl(points)
     del points #remove extra reference to points as soon as possible
     for cluster in clusters:
-        yield cluster
+        yield cluster + (scorer(cluster, incl),)
 
-def _gen_lazy_tree(clfn, ncutoff, points_inds):
+def _gen_lazy_tree(clfn, ncutoff, points_inds, scorer):
     """
     This lazily generates the tree structure used by clusters
     This only computes clusters on demand, so the clustering algorithm can take
@@ -30,8 +30,8 @@ def _gen_lazy_tree(clfn, ncutoff, points_inds):
         #since _gen_lazy_tree itself is a generator,
         #it won't call cluster until actually iterated
         #tested 2.7 and 3.2
-        children = (_gen_lazy_tree(clfn, ncutoff, cluster)
-                    for cluster in _lazy_clusters(clfn, points))
+        children = (_gen_lazy_tree(clfn, ncutoff, cluster, scorer)
+                    for cluster in _lazy_clusters(clfn, points, scorer))
         return {"children" : children, "cluster" : indicies}
 
 def _force_tree(intree, modfn):
@@ -238,9 +238,10 @@ class SplittingClustering(BaseEstimator, ClusterMixin):
         if not self.keep_clusters:
             for x in clusters:
                 dat = x.data
-                if "children" in dat: # clear out extra references to clusters
-                    del dat["clusters"]
                 self._set_indicies(clnum, dat["cluster"])
+                if "children" in dat: # clear out extra references to clusters
+                    del dat["children"]
+
         else:
             for x in clusters:
                 self._set_indicies(clnum, dat["cluster"])
